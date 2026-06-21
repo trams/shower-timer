@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+  <meta name="theme-color" content="#000000">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <link rel="manifest" href="manifest.json">
+  <title>Shower</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body {
+      height: 100%;
+      background: #000;
+      color: #fff;
+      font-family: 'Courier New', Courier, monospace;
+      touch-action: manipulation;
+      user-select: none;
+      -webkit-user-select: none;
+      overflow: hidden;
+    }
+
+    body {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8vw 4vw;
+    }
+
+    #display {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 23vw;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      line-height: 1;
+      transition: color 0.4s;
+    }
+
+    #display.green { color: #00e040; }
+    #display.yellow { color: #e0c000; }
+    #display.red { color: #e02000; }
+
+    #sep {
+      display: inline-block;
+      /* visibility toggled for blink */
+    }
+    #sep.hidden { visibility: hidden; }
+
+    #btn {
+      width: 100%;
+      padding: 5vw 0;
+      font-size: 9vw;
+      font-weight: 700;
+      font-family: inherit;
+      background: #1a1a1a;
+      color: #fff;
+      border: 2px solid #444;
+      border-radius: 3vw;
+      cursor: pointer;
+      letter-spacing: 0.05em;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    #btn:active {
+      background: #333;
+    }
+  </style>
+</head>
+<body>
+
+  <div id="display" class="green">
+    <span id="mm">00</span><span id="sep">:</span><span id="ss">00</span>
+  </div>
+
+  <button id="btn">START</button>
+
+  <script>
+    const THRESHOLD1 = 240; // 4 minutes
+    const THRESHOLD2 = 480; // 8 minutes
+
+    const display = document.getElementById('display');
+    const mmEl    = document.getElementById('mm');
+    const ssEl    = document.getElementById('ss');
+    const sepEl   = document.getElementById('sep');
+    const btn     = document.getElementById('btn');
+
+    let startPerf  = 0;
+    let running    = false;
+    let ticker     = null;
+    let wakeLock   = null;
+    let sepVisible = true;
+
+    function pad(n) { return String(n).padStart(2, '0'); }
+
+    function tick() {
+      const elapsed = (performance.now() - startPerf) / 1000;
+
+      // blink separator
+      sepVisible = !sepVisible;
+      sepEl.classList.toggle('hidden', !sepVisible);
+
+      // display: floor seconds to 15s steps
+      const mm = Math.floor(elapsed / 60);
+      const ss = Math.floor((elapsed % 60) / 15) * 15;
+      mmEl.textContent = pad(mm);
+      ssEl.textContent = pad(ss);
+
+      // color based on raw elapsed
+      if (elapsed <= THRESHOLD1) {
+        display.className = 'green';
+      } else if (elapsed <= THRESHOLD2) {
+        display.className = 'yellow';
+      } else {
+        display.className = 'red';
+      }
+    }
+
+    async function requestWakeLock() {
+      if (!('wakeLock' in navigator)) return;
+      try {
+        wakeLock = await navigator.wakeLock.request('screen');
+      } catch (_) { /* silently ignore in non-secure contexts */ }
+    }
+
+    function releaseWakeLock() {
+      if (wakeLock) {
+        wakeLock.release().catch(() => {});
+        wakeLock = null;
+      }
+    }
+
+    // Re-acquire wake lock when tab becomes visible again (Android releases it on hide)
+    document.addEventListener('visibilitychange', () => {
+      if (running && document.visibilityState === 'visible') {
+        requestWakeLock();
+      }
+    });
+
+    function start() {
+      startPerf  = performance.now();
+      running    = true;
+      sepVisible = true;
+      sepEl.classList.remove('hidden');
+
+      // Reset display immediately
+      mmEl.textContent = '00';
+      ssEl.textContent = '00';
+      display.className = 'green';
+
+      ticker = setInterval(tick, 500);
+      btn.textContent = 'STOP';
+
+      // Privileged APIs — must be called synchronously in the click handler
+      document.documentElement.requestFullscreen().catch(() => {});
+      requestWakeLock();
+    }
+
+    function stop() {
+      running = false;
+      clearInterval(ticker);
+      ticker = null;
+      btn.textContent = 'START';
+      sepEl.classList.remove('hidden');
+      releaseWakeLock();
+    }
+
+    btn.addEventListener('click', () => {
+      if (running) stop(); else start();
+    });
+
+    // Register service worker
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('sw.js').catch(() => {});
+    }
+  </script>
+</body>
+</html>
