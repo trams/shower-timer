@@ -1,0 +1,7 @@
+{
+  "env": {
+    "MLFLOW_CLAUDE_TRACING_ENABLED": "true",
+    "MLFLOW_TRACKING_URI": "databricks",
+    "MLFLOW_EXPERIMENT_ID": "123399021241549"
+  }
+}
