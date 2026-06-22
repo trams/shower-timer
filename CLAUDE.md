@@ -19,16 +19,27 @@ python3 serve.py   # prints LAN URL; accept self-signed cert on Android
 ```
 
 ## WSL2 → Android (same WiFi)
+Our WSL is configured with mirroring networking so above commands should work
 
-WSL2 is not directly reachable from the phone. Run this on **Windows (PowerShell Admin)**
-after every WSL restart (WSL IP changes on reboot):
+## Deploying (Cloudflare Pages)
 
-```powershell
-netsh interface portproxy add v4tov4 listenport=8443 listenaddress=0.0.0.0 connectport=8443 connectaddress=<WSL_IP>
-netsh advfirewall firewall add rule name="WSL2 Shower Timer" dir=in action=allow protocol=TCP localport=8443
+Live at **https://shower-timer.pages.dev** (project `shower-timer`, free Cloudflare account).
+
+```bash
+npx wrangler login   # once, interactive (browser OAuth)
+./deploy.sh          # stages only static assets, then `wrangler pages deploy`
 ```
 
-Get current WSL IP: `hostname -I | awk '{print $1}'`
+`deploy.sh` copies **only** `index.html`, `manifest.json`, `sw.js`, `icons/` into a
+temp dir and deploys that. Do NOT `wrangler pages deploy .` from the repo root:
+`.assetsignore` is silently ignored for Pages deploys, so it would upload the whole
+tree — including the local-only `key.pem` (private TLS key). Keep certs/scripts/docs
+out of any deploy.
+
+Cache note: Pages caches per edge node; a deploy only busts caches at nodes hit
+afterward, and `*.pages.dev` has no global purge. If a sensitive file is ever
+published, **rotate the secret** (don't rely on cache expiry) — e.g. regenerate
+the self-signed cert: `rm cert.pem key.pem` (serve.py recreates them).
 
 ## What's next (stage 2)
 
