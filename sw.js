@@ -1,4 +1,4 @@
-const CACHE = 'shower-v1';
+const CACHE = 'shower-v2';
 const SHELL = [
   '.',
   'manifest.json',
