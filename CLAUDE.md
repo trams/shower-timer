@@ -21,20 +21,25 @@ python3 serve.py   # prints LAN URL; accept self-signed cert on Android
 ## WSL2 → Android (same WiFi)
 Our WSL is configured with mirroring networking so above commands should work
 
-## Deploying (Cloudflare Pages)
+## Deploying (Cloudflare Pages — Git integration)
 
 Live at **https://shower-timer.pages.dev** (project `shower-timer`, free Cloudflare account).
 
-```bash
-npx wrangler login   # once, interactive (browser OAuth)
-./deploy.sh          # stages only static assets, then `wrangler pages deploy`
-```
+**Every push to `main` auto-deploys** — the CF Pages project is connected to the GitHub repo
+(`trams/shower-timer`), so there is no manual deploy step. PRs/branches get preview URLs.
 
-`deploy.sh` copies **only** `index.html`, `manifest.json`, `sw.js`, `icons/` into a
-temp dir and deploys that. Do NOT `wrangler pages deploy .` from the repo root:
-`.assetsignore` is silently ignored for Pages deploys, so it would upload the whole
-tree — including the local-only `key.pem` (private TLS key). Keep certs/scripts/docs
-out of any deploy.
+Build settings (configured in the Cloudflare dashboard, since this is a no-build static site):
+- **Framework preset:** None
+- **Build command:** `mkdir -p _site && cp index.html manifest.json sw.js _site/ && cp -r icons _site/`
+- **Build output directory:** `_site`
+
+The build command stages **only** the static PWA assets into `_site`, so `docs/`, `serve.py`,
+and other tracked files are not published. (Certs `cert.pem`/`key.pem` are gitignored, so they
+are never in the repo or a deploy.)
+
+> Note: the project is now Git-connected. Cloudflare does not allow Direct-Upload
+> (`wrangler pages deploy`) against a Git-connected project, so the old `deploy.sh` no longer
+> applies — deploy by pushing to `main`.
 
 Cache note: Pages caches per edge node; a deploy only busts caches at nodes hit
 afterward, and `*.pages.dev` has no global purge. If a sensitive file is ever
